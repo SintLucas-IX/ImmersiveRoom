@@ -1677,7 +1677,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Anaglyph3D
   aan: 0
-  bril: 0
+  bril: 4
   oogafstand: 0.065
   focusAfstand: 4
   wisselToets: 96

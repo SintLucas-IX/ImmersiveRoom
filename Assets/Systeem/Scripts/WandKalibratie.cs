@@ -154,6 +154,7 @@ public class WandKalibratie : MonoBehaviour
                 UnityEngine.SceneManagement.SceneManager.LoadScene(args[si + 1]);
             else Debug.LogWarning("[WandKalibratie] Scene '" + args[si + 1] + "' staat niet in de build.");
         }
+        if (Array.IndexOf(args, "-kleurtest") >= 0) { ZetKleurtest(true); return; }
         if (Array.IndexOf(args, "-kalibratie") < 0) return;
         GetComponent<HoekTest>()?.Toon(true);
         contentModus = true;
@@ -386,6 +387,17 @@ public class WandKalibratie : MonoBehaviour
 
     void BijSceneIngedeeld(IReadOnlyDictionary<UnityEngine.Object, int> wandVan)
     {
+        // Omgevingslicht: een scene zonder gebakken lichtgegevens krijgt in een build anders zwart omgevingslicht
+        // (in de Editor rekent Unity het zelf uit). Zo ziet de build eruit zoals in Play Mode.
+        if (RenderSettings.ambientMode == UnityEngine.Rendering.AmbientMode.Flat)
+        {
+            var sh = new UnityEngine.Rendering.SphericalHarmonicsL2();
+            var kleur = RenderSettings.ambientLight;
+            sh.AddAmbientLight(QualitySettings.activeColorSpace == ColorSpace.Linear ? kleur.linear : kleur);
+            RenderSettings.ambientProbe = sh;
+        }
+        else DynamicGI.UpdateEnvironment();
+
         // Eerst de camera's: die tekenen voortaan naar het wandbeeld
         foreach (var kv in wandVan)
         {
@@ -403,6 +415,13 @@ public class WandKalibratie : MonoBehaviour
             var w = wanden[kv.Value - 1];
             if (w.camera == null || canvas.renderMode != RenderMode.ScreenSpaceOverlay) continue;
             RegistreerCanvas(canvas, w.camera, 0.5f);
+        }
+        // Die vlakken (laag UI) zijn alleen voor de wandcamera's: andere camera's (bv. de voorbeelden op het bedienscherm) zien ze niet
+        foreach (var cam in FindObjectsByType<Camera>(FindObjectsSortMode.None))
+        {
+            bool wandcamera = false;
+            foreach (var w in wanden) if (w.camera == cam) wandcamera = true;
+            if (!wandcamera && cam.targetTexture != null && cam.transform.root != transform) cam.cullingMask &= ~(1 << LaagUI);
         }
         for (int i = 0; i < AantalWanden; i++)
         {
@@ -473,6 +492,8 @@ public class WandKalibratie : MonoBehaviour
         if (meldingTot > 0 && Time.unscaledTime > meldingTot) { meldingTot = 0; if (!Bezig && bedienPaneel != null) bedienPaneel.SetActive(false); }
         var tb = Keyboard.current;
         if (tb == null) return;
+
+        if (!Bezig && tb[KleurtestToets].wasPressedThisFrame && InBuild) { ZetKleurtest(kleurBord[0] == null); return; }
 
         if (!Bezig)
         {
@@ -570,6 +591,69 @@ public class WandKalibratie : MonoBehaviour
         w.instelling.ZetHoek(huidigeHoek, p);
         ZetWarp(huidigeWand);
         ToonKalibratie();
+    }
+
+    // ---------- Kleurtest voor de 3D-brillen (F8) ----------
+
+    const Key KleurtestToets = Key.F8;
+    readonly GameObject[] kleurBord = new GameObject[AantalWanden];
+
+    // Wand 1: kleuren voor het LINKERoog (rood glas); moeten zo goed mogelijk wegvallen achter het blauwe glas (rechteroog)
+    static readonly Color32[] TestRood =
+    {
+        new Color32(255, 0, 0, 255), new Color32(220, 0, 0, 255), new Color32(180, 0, 0, 255), new Color32(255, 40, 0, 255),
+        new Color32(255, 80, 0, 255), new Color32(255, 120, 0, 255), new Color32(255, 0, 40, 255), new Color32(255, 0, 80, 255),
+        new Color32(255, 0, 128, 255), new Color32(255, 60, 60, 255), new Color32(200, 0, 60, 255), new Color32(160, 0, 40, 255),
+    };
+
+    // Wand 3: kleuren voor het RECHTERoog (blauw glas); moeten zo goed mogelijk wegvallen achter het rode glas (linkeroog)
+    static readonly Color32[] TestBlauw =
+    {
+        // Ronde 2 (Luc, 25-11: in ronde 1 was zuiver blauw 0/0/255 het beste, maar kwam nog door het rode glas): donkerder blauw
+        new Color32(0, 0, 255, 255), new Color32(0, 0, 220, 255), new Color32(0, 0, 190, 255), new Color32(0, 0, 160, 255),
+        new Color32(0, 0, 130, 255), new Color32(0, 0, 100, 255), new Color32(0, 20, 255, 255), new Color32(0, 20, 190, 255),
+        new Color32(0, 40, 160, 255), new Color32(0, 30, 120, 255), new Color32(0, 10, 80, 255), new Color32(0, 0, 60, 255),
+    };
+
+    void ZetKleurtest(bool aan)
+    {
+        for (int i = 0; i < AantalWanden; i++)
+            if (kleurBord[i] != null) { Destroy(kleurBord[i]); kleurBord[i] = null; }
+        if (!aan) { ToonMelding("Kleurtest uit.", 3f); return; }
+        kleurBord[0] = MaakKleurBord(0, TestRood, "ROOD   -   kijk door het BLAUWE glas (rechteroog, linkeroog dicht)");
+        kleurBord[2] = MaakKleurBord(2, TestBlauw, "BLAUW   -   kijk door het RODE glas (linkeroog, rechteroog dicht)");
+        ToonMelding("KLEURTEST 3D-BRIL\n\n" +
+                    "Wand 1 (bij de pc): rode vlakken. Doe je LINKERoog dicht en kijk door het BLAUWE glas:\n" +
+                    "welk nummer valt het meest weg (is het donkerst, bijna zwart)?\n\n" +
+                    "Wand 3 (tegenover de pc): blauwe vlakken. Doe je RECHTERoog dicht en kijk door het RODE glas:\n" +
+                    "welk nummer valt het meest weg?\n\n" +
+                    "Twijfel tussen twee? Noem ze allebei.\n\nF8 = kleurtest uit", 0f);
+    }
+
+    GameObject MaakKleurBord(int i, Color32[] kleuren, string titel)
+    {
+        var w = wanden[i];
+        if (w.camera == null) return null;
+        var go = new GameObject("Kleurtest wand " + (i + 1), typeof(Canvas));
+        go.transform.SetParent(transform, false);
+        var canvas = go.GetComponent<Canvas>();
+        canvas.sortingOrder = 3000;
+        RegistreerCanvas(canvas, w.camera, 0.35f);
+        Vlak(go.transform, Color.black, Vector2.zero, Vector2.one);
+        var kop = Tekst(go.transform, titel, 56, TextAnchor.MiddleCenter, new Vector2(0, 0.88f), new Vector2(1, 0.98f));
+        kop.color = new Color(0.6f, 0.6f, 0.6f);
+        const int kolommen = 4, rijen = 3;
+        for (int k = 0; k < kleuren.Length; k++)
+        {
+            int kol = k % kolommen, rij = k / kolommen;
+            float x0 = 0.04f + kol * 0.24f, x1 = x0 + 0.20f;
+            float y1 = 0.84f - rij * 0.28f, y0 = y1 - 0.20f;
+            Vlak(go.transform, kleuren[k], new Vector2(x0, y0), new Vector2(x1, y1));
+            var nr = Tekst(go.transform, (k + 1).ToString(), 64, TextAnchor.UpperCenter, new Vector2(x0, y0 - 0.075f), new Vector2(x1, y0 - 0.005f));
+            nr.color = new Color(0.55f, 0.55f, 0.55f);
+        }
+        ZetLaag(go, LaagUI);
+        return go;
     }
 
     // ---------- Kalibreren met content (F9) ----------

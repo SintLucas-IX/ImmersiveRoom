@@ -11,7 +11,7 @@ using UnityEngine.UI;
 /// </summary>
 public class Anaglyph3D : MonoBehaviour
 {
-    public enum Bril { RoodBlauw = 0, RoodCyaanKleur = 1, RoodCyaanDubois = 2, RoodCyaanGrijs = 3 }
+    public enum Bril { RoodBlauw = 0, RoodCyaanKleur = 1, RoodCyaanDubois = 2, RoodCyaanGrijs = 3, Gekalibreerd = 4 }
 
     [Tooltip("3D aan of uit.")]
     public bool aan = false;
@@ -19,7 +19,15 @@ public class Anaglyph3D : MonoBehaviour
     [Tooltip("Welk brilletje en welke weergave? Rood glas zit links.\n" +
              "Rood Cyaan Grijs: rustigst en lichtst (aanrader). Kleur: houdt de sfeer. Dubois: kleur met minder spookbeelden.\n" +
              "Rood Blauw: voor brilletjes met een blauw (geen cyaan) glas.")]
-    public Bril bril = Bril.RoodCyaanGrijs;
+    public Bril bril = Bril.Gekalibreerd;
+
+    [Tooltip("Alleen bij Gekalibreerd: kleur voor het linkeroog (rood glas). Gekozen met de kleurtest (F8) in de Immersive Room:\n" +
+             "de rode kleur die het BLAUWE glas het best tegenhoudt (25-11-2026: 180/0/0).")]
+    public Color kleurLinks = new Color32(180, 0, 0, 255);
+
+    [Tooltip("Alleen bij Gekalibreerd: kleur voor het rechteroog (blauw glas). Gekozen met de kleurtest (F8):\n" +
+             "de lichtste blauwe kleur die het RODE glas nog goed tegenhoudt (25-11-2026: 0/0/100).")]
+    public Color kleurRechts = new Color32(0, 0, 100, 255);
 
     [Tooltip("Afstand tussen de ogen in meters. Groter = sterker 3D-effect (maar vermoeiender). Normaal 0.065.")]
     [Range(0f, 0.3f)] public float oogafstand = 0.065f;
@@ -131,6 +139,8 @@ public class Anaglyph3D : MonoBehaviour
         oog.CopyFrom(wand);
         oog.targetTexture = doel;
         oog.targetDisplay = 0;
+        // De ogen zien de teksten en het 3D-beeld zelf niet (laag UI), anders kijken ze naar hun eigen beeld
+        oog.cullingMask &= ~(1 << LayerMask.NameToLayer("UI"));
         oog.depth = wand.depth - 1;   // eerst de ogen, dan de wand
         oog.enabled = false;
         return oog;
@@ -148,6 +158,8 @@ public class Anaglyph3D : MonoBehaviour
             p.materiaal.SetFloat("_Modus", (float)bril);
             p.materiaal.SetFloat("_Helderheid", helderheid);
             p.materiaal.SetFloat("_Gamma", gamma);
+            p.materiaal.SetColor("_KleurLinks", kleurLinks);
+            p.materiaal.SetColor("_KleurRechts", kleurRechts);
         }
     }
 

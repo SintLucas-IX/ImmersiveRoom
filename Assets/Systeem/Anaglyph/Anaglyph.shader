@@ -6,7 +6,9 @@ Shader "Systeem/Anaglyph"
     {
         _MainTex ("Linkeroog", 2D) = "black" {}
         _RechtsTex ("Rechteroog", 2D) = "black" {}
-        _Modus ("Bril: 0 rood/blauw, 1 rood/cyaan kleur, 2 rood/cyaan Dubois, 3 rood/cyaan grijs", Float) = 3
+        _Modus ("Bril: 0 rood/blauw, 1 rood/cyaan kleur, 2 rood/cyaan Dubois, 3 rood/cyaan grijs, 4 gekalibreerd", Float) = 3
+        _KleurLinks ("Gekalibreerd: kleur voor het linkeroog (rood glas)", Color) = (0.706, 0, 0, 1)
+        _KleurRechts ("Gekalibreerd: kleur voor het rechteroog (blauw glas)", Color) = (0, 0, 0.392, 1)
         _Helderheid ("Helderheid", Float) = 1.6
         _Gamma ("Gamma (kleiner dan 1 = donkere delen lichter)", Float) = 0.8
     }
@@ -27,6 +29,8 @@ Shader "Systeem/Anaglyph"
             float _Modus;
             float _Helderheid;
             float _Gamma;
+            float4 _KleurLinks;
+            float4 _KleurRechts;
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; };
             struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
@@ -45,6 +49,15 @@ Shader "Systeem/Anaglyph"
                 float3 R = tex2D(_RechtsTex, i.uv).rgb;
                 float3 grijs = float3(0.299, 0.587, 0.114);
                 float3 kleur;
+
+                if (_Modus > 3.5)
+                {
+                    // Gekalibreerd op de brillen in de Immersive Room (kleurtest F8): elk oog krijgt de kleur die het andere glas
+                    // het best tegenhoudt. De helderheid van elk oog komt uit het beeld (grijswaarde).
+                    float gl = pow(saturate(dot(L, grijs) * _Helderheid), _Gamma);
+                    float gr = pow(saturate(dot(R, grijs) * _Helderheid), _Gamma);
+                    return fixed4(gl * _KleurLinks.rgb + gr * _KleurRechts.rgb, 1);
+                }
 
                 if (_Modus < 0.5)
                 {
