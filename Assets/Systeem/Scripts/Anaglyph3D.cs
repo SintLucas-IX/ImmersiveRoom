@@ -47,6 +47,7 @@ public class Anaglyph3D : MonoBehaviour
         public Camera wand, links, rechts;
         public RenderTexture beeldLinks, beeldRechts;
         public GameObject canvas;
+        public Canvas canvasComponent;
         public Material materiaal;
         public int oudeMask;
     }
@@ -68,6 +69,9 @@ public class Anaglyph3D : MonoBehaviour
         var toetsenbord = Keyboard.current;
         if (toetsenbord != null && wisselToets != Key.None && toetsenbord[wisselToets].wasPressedThisFrame) Zet(!aan);
         if (aan) Bijwerken();
+
+        // Het 3D-beeld volgt de beamer van de wand (die kan tijdens het spelen veranderen, zie WandIndeling)
+        foreach (var p in paren) p.canvasComponent.targetDisplay = p.wand.targetDisplay;
     }
 
     /// <summary>Zet 3D aan of uit. Kan ook vanuit een state (UnityEvent) worden aangeroepen.</summary>
@@ -97,6 +101,7 @@ public class Anaglyph3D : MonoBehaviour
         p.canvas = new GameObject("Anaglyph " + wand.name, typeof(Canvas));
         p.canvas.transform.SetParent(transform, false);
         var canvas = p.canvas.GetComponent<Canvas>();
+        p.canvasComponent = canvas;
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.targetDisplay = wand.targetDisplay;
         canvas.sortingOrder = -100;

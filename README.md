@@ -88,6 +88,25 @@ Zet je video (`.mp4`) in `Assets/ImmersiveRoom/Video`. Selecteer **Wanden (camer
 sleep je video in **Video Clip** van de **Video Player**, en zet het scherm aan vanuit een state
 (`GameObject → SetActive` aan, en `VideoPlayer → Play`).
 
+## De wanden en de beamers
+
+Van bovenaf gezien, met de klok mee (links/rechts gezien vanaf de pc, de ruimte in kijkend):
+
+| Wand | In de ruimte | Camera | Game-weergave |
+|---|---|---|---|
+| 1 | de wand waar de pc tegenaan staat | `Wand_1` | Display 2 |
+| 2 | links | `Wand_2` | Display 3 |
+| 3 | achterwand (tegenover de pc) | `Wand_3` | Display 4 |
+| 4 | kleine wand rechts | `Wand_4` | Display 5 |
+
+Display 1 is het bedienscherm. In Unity hoef je verder niets te doen.
+
+**Docent: welke beamer is welke wand? (F12, alleen in de build)**
+Windows nummert de beamers in een eigen volgorde. Druk in de build op **F12**: elke beamer toont een grote letter
+(A t/m D). Het bedienscherm vraagt per wand welke letter erop staat. De indeling wordt bewaard in
+`C:\Users\Public\ImmersiveRoom\wandindeling.json` en geldt voor elke build op die pc. Backspace = vorige stap, Esc = stoppen.
+Staat er linksonder op het bedienscherm een rode balk "Wandindeling niet ingesteld", dan is dit nog niet gedaan.
+
 ## Je eigen scene uit een ander project (bv. je kermis of je Hygge-beleving)
 
 1. In je **eigen project**: klik in het **Project**-venster met de rechtermuisknop op je map
