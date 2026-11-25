@@ -11,7 +11,7 @@ using UnityEngine.UI;
 /// In de build tekent elke wandcamera naar een eigen beeld. Dat beeld wordt vervormd op de beamer gezet, met vier
 /// hoekpunten per wand. Instellen (kalibreren) doe je in de Immersive Room met F11, één wand tegelijk:
 ///   1-4 = hoek kiezen, pijltjes = hoek verschuiven (Shift = grote stappen, Ctrl = 1 pixel),
-///   + / - = verhouding (tot de cirkel op de muur echt rond is), PageUp/PageDown = inhoud omhoog/omlaag,
+///   PageUp/PageDown = inhoud omhoog/omlaag (fijnafstelling),
 ///   R = hoeken van deze wand terug,
 ///   Tab = volgende wand (Shift+Tab = vorige), Enter = opslaan, Esc = stoppen zonder opslaan.
 /// Bewaard in C:\Users\Public\ImmersiveRoom\wandkalibratie.json, voor elke build op die pc.
@@ -53,9 +53,22 @@ public class WandKalibratie : MonoBehaviour
         public WandInstelling Kopie() => new WandInstelling { hoeken = (float[])hoeken.Clone(), verhouding = verhouding, verschuiving = verschuiving };
     }
 
+    /// <summary>Maten van de Immersive Room (meter). Standaard: de ruimte op school (Luc, 25-11-2026).</summary>
+    [Serializable]
+    class Ruimte
+    {
+        public float breedteWand1 = 3.12f;   // wand 1 en 3 (dus ook de afstand tussen wand 2 en 4)
+        public float breedteWand2 = 3.25f;   // wand 2 en 4 (dus ook de afstand tussen wand 1 en 3)
+        public float hoogte = 2.70f;         // hoogte van het beeld op de wand
+        public float ooghoogte = 1.65f;      // ogen van de kijker: gemiddelde Nederlander 15-50 jaar (± 1,75 m lang)
+        public float kijkpuntNaarWand1 = 0f; // kijker vanuit het midden richting wand 1 (meter)
+        public float kijkpuntNaarWand2 = 0f; // kijker vanuit het midden richting wand 2 (meter)
+    }
+
     [Serializable]
     class Bestand
     {
+        public Ruimte ruimte = new Ruimte();
         public WandInstelling[] wanden;
         public string ingesteldOp = "";
         public string pc = "";
@@ -65,7 +78,6 @@ public class WandKalibratie : MonoBehaviour
     {
         public WandInstelling instelling = new WandInstelling();
         public Camera camera;
-        public float horizontaalBeeldveld;    // zoals de camera in de scene stond (graden)
         public RenderTexture beeld;
         public Canvas uitvoer;                // op de beamer: het vervormde beeld
         public RawImage uitvoerBeeld;
@@ -76,7 +88,9 @@ public class WandKalibratie : MonoBehaviour
     }
 
     readonly Wand[] wanden = new Wand[AantalWanden];
-    readonly Dictionary<Camera, float> beeldveldVan = new Dictionary<Camera, float>();
+    readonly Dictionary<Camera, Vector3> basisPositie = new Dictionary<Camera, Vector3>();
+    const float SceneOoghoogte = 1.65f;  // hoogte van de camera's in de scenes
+    Ruimte ruimte = new Ruimte();
     WandInstelling[] voorKalibratie;
     int huidigeWand, huidigeHoek;
     GameObject bedienPaneel;
@@ -90,8 +104,23 @@ public class WandKalibratie : MonoBehaviour
     static string Map => Path.Combine(Environment.GetEnvironmentVariable("PUBLIC") ?? Application.persistentDataPath, "ImmersiveRoom");
     static string Pad => Path.Combine(Map, "wandkalibratie.json");
 
+    static WandKalibratie instantie;
+
+    /// <summary>
+    /// Richting van de kijker naar hoek h (0 = wand 1-2, 1 = wand 2-3, 2 = wand 3-4, 3 = wand 4-1), met x naar wand 2 en z naar wand 1.
+    /// In de Editor (vierkant, 90 graden per wand): precies diagonaal.
+    /// </summary>
+    public static Vector2 HoekRichting(int h)
+    {
+        float sx = (h == 0 || h == 1) ? 1 : -1, sz = (h == 0 || h == 3) ? 1 : -1;
+        if (instantie == null || !InBuild) return new Vector2(sx, sz).normalized;
+        var r = instantie.ruimte;
+        return new Vector2(sx * r.breedteWand1 / 2 - r.kijkpuntNaarWand2, sz * r.breedteWand2 / 2 - r.kijkpuntNaarWand1).normalized;
+    }
+
     void Awake()
     {
+        instantie = this;
         for (int i = 0; i < AantalWanden; i++) wanden[i] = new Wand();
         if (!InBuild) return;
 
@@ -120,8 +149,13 @@ public class WandKalibratie : MonoBehaviour
             for (int i = 0; i < AantalWanden; i++)
             {
                 var w = b.wanden[i];
-                if (w != null && w.hoeken != null && w.hoeken.Length == 8 && w.verhouding > 0.2f && w.verhouding < 5f) wanden[i].instelling = w;
+                if (w != null && w.hoeken != null && w.hoeken.Length == 8) wanden[i].instelling = w;
             }
+            var r = b.ruimte;
+            if (r != null && r.breedteWand1 > 0.5f && r.breedteWand2 > 0.5f && r.hoogte > 0.5f && r.ooghoogte > 0.1f && r.ooghoogte < r.hoogte)
+                ruimte = r;
+            Debug.Log("[WandKalibratie] Ruimte: wand 1 en 3 " + ruimte.breedteWand1 + " m, wand 2 en 4 " + ruimte.breedteWand2 + " m, hoogte " +
+                      ruimte.hoogte + " m, ooghoogte " + ruimte.ooghoogte + " m");
             Debug.Log("[WandKalibratie] Geladen uit " + Pad + " (ingesteld " + b.ingesteldOp + ")");
         }
         catch (Exception e)
@@ -135,7 +169,7 @@ public class WandKalibratie : MonoBehaviour
         try
         {
             Directory.CreateDirectory(Map);
-            var b = new Bestand { wanden = new WandInstelling[AantalWanden], ingesteldOp = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), pc = Environment.MachineName };
+            var b = new Bestand { ruimte = ruimte, wanden = new WandInstelling[AantalWanden], ingesteldOp = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), pc = Environment.MachineName };
             for (int i = 0; i < AantalWanden; i++) b.wanden[i] = wanden[i].instelling;
             File.WriteAllText(Pad, JsonUtility.ToJson(b, true));
             Debug.Log("[WandKalibratie] Bewaard in " + Pad);
@@ -195,11 +229,14 @@ public class WandKalibratie : MonoBehaviour
             if (wanden[i].uitvoer != null) wanden[i].uitvoer.targetDisplay = WandIndeling.DisplayVanWand(i + 1);
     }
 
+    // Breedte van wand i (meter): wand 1 en 3 zijn even breed, wand 2 en 4 ook
+    float WandBreedte(int i) => i % 2 == 0 ? ruimte.breedteWand1 : ruimte.breedteWand2;
+
     // Het wandbeeld krijgt de verhouding van de echte wand (vierkante pixels), max 1920 breed of 2160 hoog
     void MaakBeeld(int i)
     {
         var w = wanden[i];
-        float a = w.instelling.verhouding;
+        float a = WandBreedte(i) / ruimte.hoogte;
         int breed = 1920, hoog = Mathf.RoundToInt(1920 / a);
         if (hoog > 2160) { hoog = 2160; breed = Mathf.RoundToInt(2160 * a); }
         var oud = w.beeld;
@@ -211,28 +248,46 @@ public class WandKalibratie : MonoBehaviour
         ZetCamera(i);
     }
 
-    // Horizontaal beeldveld blijft zoals in de scene (de wanden sluiten zo op elkaar aan), de hoogte volgt de verhouding
+    /// <summary>
+    /// Het kijkvenster van wand i, berekend uit de maten van de ruimte: vanaf het oog van de kijker gezien is de wand een rechthoek.
+    /// links/rechts/onder/boven zijn de randen van die rechthoek gedeeld door de afstand tot de wand (tangens).
+    /// Zo sluiten de vier wanden precies op elkaar aan, ook als de ruimte niet vierkant is of de kijker niet in het midden staat.
+    /// Wand 1 ligt in de kijkrichting van Wand_1 (+Z), wand 2 in die van Wand_2 (+X), enzovoort.
+    /// </summary>
+    void Venster(int i, out float d, out float links, out float rechts, out float onder, out float boven)
+    {
+        float B = ruimte.breedteWand1, L = ruimte.breedteWand2;      // B = afstand wand 2-4, L = afstand wand 1-3
+        float kx = ruimte.kijkpuntNaarWand2, kz = ruimte.kijkpuntNaarWand1;
+        switch (i)
+        {
+            case 0: d = L / 2 - kz; links = -B / 2 - kx; rechts = B / 2 - kx; break;     // wand 1, rechts = +X
+            case 1: d = B / 2 - kx; links = -(L / 2 - kz); rechts = L / 2 + kz; break;   // wand 2, rechts = -Z
+            case 2: d = L / 2 + kz; links = -(B / 2 - kx); rechts = B / 2 + kx; break;   // wand 3, rechts = -X
+            default: d = B / 2 + kx; links = -L / 2 - kz; rechts = L / 2 - kz; break;    // wand 4, rechts = +Z
+        }
+        onder = -ruimte.ooghoogte;
+        boven = ruimte.hoogte - ruimte.ooghoogte;
+    }
+
     void ZetCamera(int i)
     {
         var w = wanden[i];
         if (w.camera == null) return;
-        float a = w.instelling.verhouding;
-        float h = w.horizontaalBeeldveld * Mathf.Deg2Rad;
         var cam = w.camera;
-        cam.ResetProjectionMatrix();
-        cam.aspect = a;
-        cam.fieldOfView = 2f * Mathf.Atan(Mathf.Tan(h / 2f) / a) * Mathf.Rad2Deg;
 
-        // Inhoud omhoog: het beeldvlak schuift omlaag (zelfde beeldveld, geen zwarte rand)
-        float s = w.instelling.verschuiving;
-        if (Mathf.Abs(s) > 0.0001f)
-        {
-            float n = cam.nearClipPlane;
-            float top = n * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
-            float rechts = top * a;
-            float schuif = 2f * top * s;
-            cam.projectionMatrix = Matrix4x4.Frustum(-rechts, rechts, -top - schuif, top - schuif, n, cam.farClipPlane);
-        }
+        // Camera op de plek van het oog van de kijker (in de scene: midden van de ruimte op 1,65 m)
+        if (!basisPositie.ContainsKey(cam)) basisPositie[cam] = cam.transform.position;
+        cam.transform.position = basisPositie[cam] + new Vector3(ruimte.kijkpuntNaarWand2, ruimte.ooghoogte - SceneOoghoogte, ruimte.kijkpuntNaarWand1);
+
+        Venster(i, out float d, out float links, out float rechts, out float onder, out float boven);
+        d = Mathf.Max(0.1f, d);
+        // Fijnafstelling: inhoud omhoog (+) of omlaag (-), deel van de wandhoogte
+        float schuif = w.instelling.verschuiving * (boven - onder);
+        float n = cam.nearClipPlane, f = n / d;
+        cam.ResetProjectionMatrix();
+        cam.aspect = (rechts - links) / (boven - onder);
+        cam.fieldOfView = 2f * Mathf.Atan((boven - onder) / 2f / d) * Mathf.Rad2Deg;   // alleen ter info (bv. voor de teksten)
+        cam.projectionMatrix = Matrix4x4.Frustum(links * f, rechts * f, (onder - schuif) * f, (boven - schuif) * f, n, cam.farClipPlane);
     }
 
     void BijSceneIngedeeld(IReadOnlyDictionary<UnityEngine.Object, int> wandVan)
@@ -242,14 +297,7 @@ public class WandKalibratie : MonoBehaviour
         {
             if (!(kv.Key is Camera cam) || cam == null) continue;
             var w = wanden[kv.Value - 1];
-            if (!beeldveldVan.ContainsKey(cam))
-            {
-                // Zoals de camera op een 16:9-beamer stond
-                float v = cam.fieldOfView * Mathf.Deg2Rad;
-                beeldveldVan[cam] = 2f * Mathf.Atan(Mathf.Tan(v / 2f) * StandaardVerhouding) * Mathf.Rad2Deg;
-            }
             w.camera = cam;
-            w.horizontaalBeeldveld = beeldveldVan[cam];
             cam.targetTexture = w.beeld;
             cam.cullingMask |= 1 << LaagUI;
             ZetCamera(kv.Value - 1);
@@ -373,7 +421,7 @@ public class WandKalibratie : MonoBehaviour
         }
 
         // Pijltjes en + / -: één keer per druk, en snel herhalen als je de toets vasthoudt
-        Key[] toetsen = { Key.LeftArrow, Key.RightArrow, Key.UpArrow, Key.DownArrow, Key.Equals, Key.NumpadPlus, Key.Minus, Key.NumpadMinus, Key.PageUp, Key.PageDown };
+        Key[] toetsen = { Key.LeftArrow, Key.RightArrow, Key.UpArrow, Key.DownArrow, Key.PageUp, Key.PageDown };
         Key actief = Key.None;
         foreach (var k in toetsen)
         {
@@ -400,16 +448,6 @@ public class WandKalibratie : MonoBehaviour
             return;
         }
 
-        if (actief == Key.Equals || actief == Key.NumpadPlus || actief == Key.Minus || actief == Key.NumpadMinus)
-        {
-            float stap = shift ? 0.05f : ctrl ? 0.002f : 0.01f;
-            float teken = (actief == Key.Minus || actief == Key.NumpadMinus) ? -1 : 1;
-            w.instelling.verhouding = Mathf.Clamp(w.instelling.verhouding + teken * stap, 0.3f, 4f);
-            MaakBeeld(huidigeWand);
-            if (w.testbeeld != null) { Destroy(w.testbeeld); w.testbeeld = null; }
-            ToonKalibratie();
-            return;
-        }
 
         int display = WandIndeling.DisplayVanWand(huidigeWand + 1);
         float bw = display < Display.displays.Length ? Display.displays[display].systemWidth : 1920;
@@ -483,7 +521,9 @@ public class WandKalibratie : MonoBehaviour
             var p = wi.Hoek(k);
             s += (k == huidigeHoek ? ">> " : "    ") + "hoek " + (k + 1) + " " + HoekNaam[k] + ":  x " + Mathf.RoundToInt(p.x * bw) + "  y " + Mathf.RoundToInt((1 - p.y) * bh) + "\n";
         }
-        s += "\nVerhouding: " + wi.verhouding.ToString("0.000") + "   (zet + / - tot de cirkel op de muur rond is)\n" +
+        s += "\nRuimte: wand 1/3 " + ruimte.breedteWand1.ToString("0.00") + " m, wand 2/4 " + ruimte.breedteWand2.ToString("0.00") +
+             " m, hoogte " + ruimte.hoogte.ToString("0.00") + " m, ooghoogte " + ruimte.ooghoogte.ToString("0.00") +
+             " m   (de rode cirkel moet rond zijn)\n" +
              "Inhoud omhoog: " + (wi.verschuiving * 100f).ToString("0.0") + " % van de hoogte   (PageUp / PageDown)\n\n" +
              "1-4 = hoek kiezen      pijltjes = hoek verschuiven (Shift = 20 px, Ctrl = 1 px)\n" +
              "R = hoeken van deze wand terug      Tab = volgende wand (Shift+Tab = vorige)\n" +

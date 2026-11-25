@@ -40,8 +40,10 @@ public class HoekTest : MonoBehaviour
         inhoud = new GameObject("Hoektest (F9)");   // in de scene, zodat de wandcamera's het zien
         for (int h = 0; h < 4; h++)
         {
-            // Hoek tussen wand h+1 en h+2: 45 graden na wand h+1 (wand 2 staat 90 graden met de klok mee na wand 1)
-            var richting = Quaternion.Euler(0, 45 + 90 * h, 0) * vooruit;
+            // Hoek tussen wand h+1 en h+2, in de richting van de echte hoek van de ruimte (zie WandKalibratie)
+            var rechts = Vector3.Cross(Vector3.up, vooruit);   // naar wand 2
+            var hr = WandKalibratie.HoekRichting(h);
+            var richting = (rechts * hr.x + vooruit * hr.y).normalized;
             var voet = new Vector3(midden.x, 0, midden.z) + richting * Afstand;
             int volgende = h == 3 ? 1 : h + 2;
             var hoek = new GameObject("Hoek wand " + (h + 1) + "-" + volgende).transform;

@@ -164,12 +164,12 @@ public class Anaglyph3D : MonoBehaviour
     public static Matrix4x4 OogProjectie(Camera wand, float aspect, float oogafstand, float focusAfstand, bool links)
     {
         float near = wand.nearClipPlane, far = wand.farClipPlane;
-        float top = near * Mathf.Tan(wand.fieldOfView * 0.5f * Mathf.Deg2Rad);
-        float halfBreed = top * aspect;
+        // Het kijkvenster van de wandcamera zelf (in de build scheef, berekend uit de maten van de ruimte: zie WandKalibratie)
+        var p = wand.projectionMatrix;
+        float breed = 2f * near / p[0, 0], hoog = 2f * near / p[1, 1];
+        float midX = p[0, 2] * breed / 2f, midY = p[1, 2] * hoog / 2f;
         float schuif = (oogafstand / 2f) * near / Mathf.Max(0.01f, focusAfstand);
         float s = links ? schuif : -schuif;
-        // Is het beeld van de wand omhoog geschoven (WandKalibratie)? Dan de ogen ook
-        float v = wand.projectionMatrix[1, 2] * top;
-        return Matrix4x4.Frustum(-halfBreed + s, halfBreed + s, -top + v, top + v, near, far);
+        return Matrix4x4.Frustum(midX - breed / 2f + s, midX + breed / 2f + s, midY - hoog / 2f, midY + hoog / 2f, near, far);
     }
 }
