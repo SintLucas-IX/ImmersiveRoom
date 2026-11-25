@@ -83,6 +83,7 @@ public class WandIndeling : MonoBehaviour
         DontDestroyOnLoad(go);
         instantie = go.AddComponent<WandIndeling>();
         go.AddComponent<WandKalibratie>();
+        go.AddComponent<HoekTest>();
     }
 
     /// <summary>Na elke geladen scene: welke camera's en canvassen bij welke wand (1-4) horen.</summary>
