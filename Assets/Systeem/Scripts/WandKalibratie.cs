@@ -12,7 +12,7 @@ using UnityEngine.UI;
 /// hoekpunten per wand. Instellen (kalibreren) doe je in de Immersive Room met F11, één wand tegelijk:
 ///   1-4 = hoek kiezen, pijltjes = hoek verschuiven (Shift = grote stappen, Ctrl = 1 pixel),
 ///   PageUp/PageDown = inhoud omhoog/omlaag (fijnafstelling),
-///   R = hoeken van deze wand terug,
+///   R = hoeken van deze wand terug, T = testbeeld of content (scene + hoektest F9) tonen,
 ///   Tab = volgende wand (Shift+Tab = vorige), Enter = opslaan, Esc = stoppen zonder opslaan.
 /// Bewaard in C:\Users\Public\ImmersiveRoom\wandkalibratie.json, voor elke build op die pc.
 /// In de Editor gebeurt er niets: daar zie je de wanden gewoon in de Game-weergave (Display 2-5).
@@ -93,6 +93,7 @@ public class WandKalibratie : MonoBehaviour
     Ruimte ruimte = new Ruimte();
     WandInstelling[] voorKalibratie;
     int huidigeWand, huidigeHoek;
+    bool metContent;   // T: kalibreren terwijl de scene (en de hoektest F9) in beeld is
     GameObject bedienPaneel;
     Text bedienTekst;
     float meldingTot;
@@ -110,13 +111,19 @@ public class WandKalibratie : MonoBehaviour
     /// Richting van de kijker naar hoek h (0 = wand 1-2, 1 = wand 2-3, 2 = wand 3-4, 3 = wand 4-1), met x naar wand 2 en z naar wand 1.
     /// In de Editor (vierkant, 90 graden per wand): precies diagonaal.
     /// </summary>
-    public static Vector2 HoekRichting(int h)
+    public static Vector2 HoekRichting(int h) => HoekPlek(h).normalized;
+
+    /// <summary>Plek van hoek h vanaf de kijker (meter), x naar wand 2, z naar wand 1. In de Editor: de standaardmaten.</summary>
+    public static Vector2 HoekPlek(int h)
     {
         float sx = (h == 0 || h == 1) ? 1 : -1, sz = (h == 0 || h == 3) ? 1 : -1;
-        if (instantie == null || !InBuild) return new Vector2(sx, sz).normalized;
-        var r = instantie.ruimte;
-        return new Vector2(sx * r.breedteWand1 / 2 - r.kijkpuntNaarWand2, sz * r.breedteWand2 / 2 - r.kijkpuntNaarWand1).normalized;
+        var r = instantie != null ? instantie.ruimte : new Ruimte();
+        return new Vector2(sx * r.breedteWand1 / 2 - r.kijkpuntNaarWand2, sz * r.breedteWand2 / 2 - r.kijkpuntNaarWand1);
     }
+
+    /// <summary>Hoogte van het beeld op de wand en de ooghoogte (meter).</summary>
+    public static float WandHoogte => instantie != null ? instantie.ruimte.hoogte : new Ruimte().hoogte;
+    public static float Ooghoogte => instantie != null ? instantie.ruimte.ooghoogte : new Ruimte().ooghoogte;
 
     void Awake()
     {
@@ -412,6 +419,12 @@ public class WandKalibratie : MonoBehaviour
         {
             if (tb[Key.Digit1 + k].wasPressedThisFrame || tb[Key.Numpad1 + k].wasPressedThisFrame) { huidigeHoek = k; ToonKalibratie(); return; }
         }
+        if (tb.tKey.wasPressedThisFrame)
+        {
+            metContent = !metContent;
+            ToonKalibratie();
+            return;
+        }
         if (tb.rKey.wasPressedThisFrame)
         {
             w.instelling.hoeken = new WandInstelling().hoeken;
@@ -504,9 +517,16 @@ public class WandKalibratie : MonoBehaviour
         {
             var w = wanden[i];
             bool deze = i == huidigeWand;
-            w.uitvoerBeeld.color = deze ? Color.white : Color.black;   // alleen de wand die je kalibreert is verlicht
+            // Testbeeld: alleen de wand die je kalibreert is verlicht. Met content (T): alle wanden tonen de scene.
+            w.uitvoerBeeld.color = deze || metContent ? Color.white : Color.black;
             if (deze && w.testbeeld == null) MaakTestbeeld(i);
-            if (w.testbeeld != null) w.testbeeld.SetActive(deze);
+            if (w.testbeeld != null)
+            {
+                w.testbeeld.SetActive(deze);
+                // Met content blijven alleen de hoekmerken staan, zodat je ziet welke hoek je verschuift
+                foreach (Transform kind in w.testbeeld.transform)
+                    kind.gameObject.SetActive(!metContent || kind.name.StartsWith("Hoek "));
+            }
         }
 
         var wi = wanden[huidigeWand].instelling;
@@ -527,6 +547,7 @@ public class WandKalibratie : MonoBehaviour
              "Inhoud omhoog: " + (wi.verschuiving * 100f).ToString("0.0") + " % van de hoogte   (PageUp / PageDown)\n\n" +
              "1-4 = hoek kiezen      pijltjes = hoek verschuiven (Shift = 20 px, Ctrl = 1 px)\n" +
              "R = hoeken van deze wand terug      Tab = volgende wand (Shift+Tab = vorige)\n" +
+             "T = " + (metContent ? "testbeeld tonen" : "content tonen (met F9: palen op de hoeken)") + "\n" +
              "Enter = opslaan en klaar      Esc = stoppen zonder opslaan";
         ToonMelding(s, 0f);
     }
