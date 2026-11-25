@@ -8,13 +8,17 @@ using UnityEngine.UI;
 /// <summary>
 /// Zorgt dat het beeld van elke beamer precies op zijn wand valt. Studenten hoeven hier niets mee te doen.
 ///
-/// In de build tekent elke wandcamera naar een eigen beeld. Dat beeld wordt vervormd op de beamer gezet, met vier
-/// hoekpunten per wand. Instellen (kalibreren) doe je in de Immersive Room met F11, één wand tegelijk:
-///   1-4 = hoek kiezen, pijltjes = hoek verschuiven (Shift = grote stappen, Ctrl = 1 pixel),
-///   PageUp/PageDown = inhoud omhoog/omlaag (fijnafstelling),
-///   R = hoeken van deze wand terug, T = testbeeld of content (scene + hoektest F9) tonen,
-///   Tab = volgende wand (Shift+Tab = vorige), Enter = opslaan, Esc = stoppen zonder opslaan.
-/// Bewaard in C:\Users\Public\ImmersiveRoom\wandkalibratie.json, voor elke build op die pc.
+/// In de build tekent elke wandcamera naar een eigen beeld, met een kijkvenster berekend uit de maten van de ruimte. Dat beeld
+/// wordt vervormd op de beamer gezet, met vier hoekpunten per wand.
+///
+/// F9 = kalibreren met content (de gewone manier): op elke hoek een paal met blokjes en bollen; wand 4 is het ijkpunt,
+///   stel wand 1 bij tot hoek 4-1 aansluit, Tab, wand 2 tot hoek 1-2 aansluit, Tab, wand 3 tot hoek 2-3 aansluit.
+///   Pijltjes = inhoud verschuiven, + / - = groter / kleiner (Shift = grote stappen, Ctrl = kleine), R = wand terug,
+///   Enter = opslaan, Esc = stoppen zonder opslaan.
+/// F11 = hoekpunten van het beamerbeeld (alleen als het beeld niet goed op de wand ligt): 1-4 = hoek, pijltjes = verschuiven,
+///   T = testbeeld of content, PageUp/PageDown = inhoud omhoog/omlaag, Tab, Enter, Esc.
+/// Bewaard in C:\Users\Public\ImmersiveRoom\wandkalibratie.json (voor elke build op die pc). Bestaat dat niet, dan geldt de
+/// standaard uit Assets/StreamingAssets/ImmersiveRoom (de Immersive Room op school, gekalibreerd 25-11-2026).
 /// In de Editor gebeurt er niets: daar zie je de wanden gewoon in de Game-weergave (Display 2-5).
 /// </summary>
 public class WandKalibratie : MonoBehaviour
@@ -47,7 +51,7 @@ public class WandKalibratie : MonoBehaviour
         public float verhouding = StandaardVerhouding;
         // Inhoud omhoog (+) of omlaag (-), als deel van de beeldhoogte. De camera kijkt dan iets lager/hoger.
         public float verschuiving = 0f;
-        // Kalibratie met content (F10): inhoud naar rechts (+) en de grootte van de inhoud (1 = berekend uit de maten)
+        // Kalibratie met content (F9): inhoud naar rechts (+) en de grootte van de inhoud (1 = berekend uit de maten)
         public float schuifX = 0f;
         public float schaal = 1f;
 
@@ -86,7 +90,7 @@ public class WandKalibratie : MonoBehaviour
         public RawImage uitvoerBeeld;
         public Material warp;
         public GameObject testbeeld;          // tijdens het kalibreren, in het wandbeeld zelf
-        public GameObject kader;              // F10: geel kader om de wand die je bijstelt
+        public GameObject kader;              // F9: geel kader om de wand die je bijstelt
         public Rect venster;                  // kijkvenster van de camera (tangens): x/y = links/onder, breedte/hoogte
         public readonly Dictionary<Canvas, float> canvassen = new Dictionary<Canvas, float>();   // canvassen in dit wandbeeld + afstand
         public RectTransform[] hoekMerk = new RectTransform[4];
@@ -100,8 +104,8 @@ public class WandKalibratie : MonoBehaviour
     WandInstelling[] voorKalibratie;
     int huidigeWand, huidigeHoek;
     bool metContent;   // T: kalibreren terwijl de scene (en de hoektest F9) in beeld is
-    bool contentModus; // F10: de virtuele wereld per wand verschuiven en schalen
-    const Key ContentToets = Key.F10;
+    bool contentModus; // F9: de virtuele wereld per wand verschuiven en schalen
+    const Key ContentToets = Key.F9;
     GameObject bedienPaneel;
     Text bedienTekst;
     float meldingTot;
@@ -112,6 +116,8 @@ public class WandKalibratie : MonoBehaviour
     static bool InBuild => !Application.isEditor;
     static string Map => Path.Combine(Environment.GetEnvironmentVariable("PUBLIC") ?? Application.persistentDataPath, "ImmersiveRoom");
     static string Pad => Path.Combine(Map, "wandkalibratie.json");
+    // Standaard uit de template (Assets/StreamingAssets/ImmersiveRoom): de Immersive Room op school, gekalibreerd 25-11-2026
+    static string StandaardPad => Path.Combine(Application.streamingAssetsPath, "ImmersiveRoom", "wandkalibratie.json");
 
     static WandKalibratie instantie;
 
@@ -138,7 +144,17 @@ public class WandKalibratie : MonoBehaviour
     // Build gestart met -kalibratie (zie "Kalibratie starten.bat"): meteen palen op de hoeken en de kalibratie met content
     void Start()
     {
-        if (!InBuild || Array.IndexOf(Environment.GetCommandLineArgs(), "-kalibratie") < 0) return;
+        if (!InBuild) return;
+        var args = Environment.GetCommandLineArgs();
+        // -scene <naam>: meteen een andere scene openen (bv. ImmersiveRoom-3D-Demo)
+        int si = Array.IndexOf(args, "-scene");
+        if (si >= 0 && si + 1 < args.Length)
+        {
+            if (UnityEngine.SceneManagement.SceneUtility.GetBuildIndexByScenePath(args[si + 1]) >= 0 || Application.CanStreamedLevelBeLoaded(args[si + 1]))
+                UnityEngine.SceneManagement.SceneManager.LoadScene(args[si + 1]);
+            else Debug.LogWarning("[WandKalibratie] Scene '" + args[si + 1] + "' staat niet in de build.");
+        }
+        if (Array.IndexOf(args, "-kalibratie") < 0) return;
         GetComponent<HoekTest>()?.Toon(true);
         contentModus = true;
         BeginKalibratie();
@@ -169,9 +185,10 @@ public class WandKalibratie : MonoBehaviour
     {
         try
         {
-            if (!File.Exists(Pad)) { Debug.Log("[WandKalibratie] Nog niet gekalibreerd (" + Pad + "). Druk F11 in de build."); return; }
-            var b = JsonUtility.FromJson<Bestand>(File.ReadAllText(Pad));
-            if (b == null || b.wanden == null || b.wanden.Length != AantalWanden) { Debug.LogWarning("[WandKalibratie] " + Pad + " is ongeldig."); return; }
+            string pad = File.Exists(Pad) ? Pad : StandaardPad;
+            if (!File.Exists(pad)) { Debug.Log("[WandKalibratie] Nog niet gekalibreerd (" + Pad + "). Druk F9 in de build."); return; }
+            var b = JsonUtility.FromJson<Bestand>(File.ReadAllText(pad));
+            if (b == null || b.wanden == null || b.wanden.Length != AantalWanden) { Debug.LogWarning("[WandKalibratie] " + pad + " is ongeldig."); return; }
             for (int i = 0; i < AantalWanden; i++)
             {
                 var w = b.wanden[i];
@@ -182,7 +199,7 @@ public class WandKalibratie : MonoBehaviour
                 ruimte = r;
             Debug.Log("[WandKalibratie] Ruimte: wand 1 en 3 " + ruimte.breedteWand1 + " m, wand 2 en 4 " + ruimte.breedteWand2 + " m, hoogte " +
                       ruimte.hoogte + " m, ooghoogte " + ruimte.ooghoogte + " m");
-            Debug.Log("[WandKalibratie] Geladen uit " + Pad + " (ingesteld " + b.ingesteldOp + ")");
+            Debug.Log("[WandKalibratie] Geladen uit " + pad + " (ingesteld " + b.ingesteldOp + ")");
         }
         catch (Exception e)
         {
@@ -307,7 +324,7 @@ public class WandKalibratie : MonoBehaviour
 
         Venster(i, out float d, out float links, out float rechts, out float onder, out float boven);
         d = Mathf.Max(0.1f, d);
-        // Kalibratie met content (F10): het venster kleiner = inhoud groter, venster verschuiven = inhoud de andere kant op
+        // Kalibratie met content (F9): het venster kleiner = inhoud groter, venster verschuiven = inhoud de andere kant op
         var wi = w.instelling;
         float s = Mathf.Clamp(wi.schaal, 0.3f, 3f);
         float mx = (links + rechts) / 2f, my = (onder + boven) / 2f;
@@ -462,7 +479,7 @@ public class WandKalibratie : MonoBehaviour
             bool f11 = tb[KalibratieToets].wasPressedThisFrame, f10 = tb[ContentToets].wasPressedThisFrame;
             if ((f11 || f10) && !WandIndeling.BezigMetInstellen)
             {
-                if (!InBuild) { Debug.Log("[WandKalibratie] Kalibreren (F10/F11) kan alleen in de build, niet in de Editor."); return; }
+                if (!InBuild) { Debug.Log("[WandKalibratie] Kalibreren (F9/F11) kan alleen in de build, niet in de Editor."); return; }
                 contentModus = f10;
                 BeginKalibratie();
             }
@@ -555,7 +572,7 @@ public class WandKalibratie : MonoBehaviour
         ToonKalibratie();
     }
 
-    // ---------- Kalibreren met content (F10) ----------
+    // ---------- Kalibreren met content (F9) ----------
 
     void UpdateContent(Keyboard tb, bool shift, bool ctrl, Wand w)
     {
@@ -697,6 +714,7 @@ public class WandKalibratie : MonoBehaviour
         herhaalToets = Key.None;
         foreach (var wd in wanden) if (wd.kader != null) { Destroy(wd.kader); wd.kader = null; }
         foreach (var c in verborgen) if (c != null) c.enabled = true;
+        GetComponent<HoekTest>()?.Toon(false);   // palen weer weg
         verborgen.Clear();
         for (int i = 0; i < AantalWanden; i++)
         {
@@ -744,7 +762,7 @@ public class WandKalibratie : MonoBehaviour
              "Inhoud omhoog: " + (wi.verschuiving * 100f).ToString("0.0") + " % van de hoogte   (PageUp / PageDown)\n\n" +
              "1-4 = hoek kiezen      pijltjes = hoek verschuiven (Shift = 20 px, Ctrl = 1 px)\n" +
              "R = hoeken van deze wand terug      Tab = volgende wand (Shift+Tab = vorige)\n" +
-             "T = " + (metContent ? "testbeeld tonen" : "content tonen (met F9: palen op de hoeken)") + "\n" +
+             "T = " + (metContent ? "testbeeld tonen" : "content tonen") + "\n" +
              "Enter = opslaan en klaar      Esc = stoppen zonder opslaan";
         ToonMelding(s, 0f);
     }

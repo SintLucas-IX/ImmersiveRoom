@@ -101,27 +101,40 @@ Van bovenaf gezien, met de klok mee (links/rechts gezien vanaf de pc, de ruimte 
 
 Display 1 is het bedienscherm. In Unity hoef je verder niets te doen.
 
+De template kent de Immersive Room op school al: de maten (wand 1/3 3,12 m, wand 2/4 3,25 m, hoogte 2,70 m, ooghoogte 1,65 m),
+welke beamer welke wand is, en de kalibratie (25-11-2026). Die staan in `Assets/StreamingAssets/ImmersiveRoom/`. Elke wand krijgt
+daarmee precies het stuk van de virtuele wereld dat je vanuit het midden van de ruimte door die wand zou zien, zodat objecten
+naadloos over de hoeken lopen. Een build start daar meteen mee.
+
+**Docent: opnieuw kalibreren (F9, alleen in de build)**
+Op elke hoek verschijnt een paal met blokjes en bollen. Wand 4 is het ijkpunt: stel **wand 1** bij tot de paal op de hoek 4-1
+aansluit, **Tab**, dan **wand 2** (hoek 1-2), **Tab**, dan **wand 3** (hoek 2-3). Pijltjes = de inhoud van de wand met het gele
+kader verschuiven, **+ / -** = groter / kleiner (Shift = grote stappen, Ctrl = kleine), R = deze wand terug, **Enter** = opslaan,
+Esc = stoppen zonder opslaan. Bewaard in `C:\Users\Public\ImmersiveRoom\wandkalibratie.json` (gaat voor de standaard).
+
 **Docent: welke beamer is welke wand? (F12, alleen in de build)**
 Windows nummert de beamers in een eigen volgorde. Druk in de build op **F12**: elke beamer toont een grote letter
 (A t/m D). Het bedienscherm vraagt per wand welke letter erop staat. De indeling wordt bewaard in
 `C:\Users\Public\ImmersiveRoom\wandindeling.json` en geldt voor elke build op die pc. Backspace = vorige stap, Esc = stoppen.
 Staat er linksonder op het bedienscherm een rode balk "Wandindeling niet ingesteld", dan is dit nog niet gedaan.
 
-**Docent: het beeld precies op de wand zetten (F11, alleen in de build)**
-Unity zet het beeld van elke beamer vervormd neer, zodat het precies op de wand valt (de beamers zelf blijven zoals ze zijn).
-Druk in de build op **F11**: één wand tegelijk krijgt een testbeeld, de andere zijn zwart.
+**Docent: het beamerbeeld op de wand leggen (F11, alleen in de build, zelden nodig)**
+Alleen als een beamer verschoven is en zijn beeld niet meer precies op de wand valt. Unity vervormt het beeld; de beamers
+zelf blijven zoals ze zijn. Eén wand tegelijk krijgt een testbeeld, de andere zijn zwart.
 
 | Toets | Wat |
 |---|---|
 | 1-4 | hoek kiezen (1 linksboven, 2 rechtsboven, 3 rechtsonder, 4 linksonder) |
 | pijltjes | hoek verschuiven (Shift = 20 pixels, Ctrl = 1 pixel) |
-| + / - | verhouding, tot de rode cirkel op de muur echt rond is |
+| T | testbeeld of content tonen |
 | PageUp / PageDown | de inhoud van deze wand omhoog / omlaag |
 | R | hoeken van deze wand terug |
 | Tab / Shift+Tab | volgende / vorige wand |
 | Enter / Esc | opslaan / stoppen zonder opslaan |
 
-Bewaard in `C:\Users\Public\ImmersiveRoom\wandkalibratie.json`, voor elke build op die pc. Studenten hoeven hier niets mee te doen.
+Studenten hoeven met F9, F11 en F12 niets te doen.
+
+**Starten met opties:** `ImmersiveRoom.exe -scene ImmersiveRoom-3D-Demo` opent meteen de 3D-demo; `-kalibratie` start meteen F9.
 
 ## Je eigen scene uit een ander project (bv. je kermis of je Hygge-beleving)
 

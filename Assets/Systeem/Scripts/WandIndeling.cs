@@ -71,6 +71,8 @@ public class WandIndeling : MonoBehaviour
 
     static string Map => Path.Combine(Environment.GetEnvironmentVariable("PUBLIC") ?? Application.persistentDataPath, "ImmersiveRoom");
     static string Pad => Path.Combine(Map, "wandindeling.json");
+    // Standaard uit de template (Assets/StreamingAssets/ImmersiveRoom): de Immersive Room op school, ingesteld 25-11-2026
+    static string StandaardPad => Path.Combine(Application.streamingAssetsPath, "ImmersiveRoom", "wandindeling.json");
 
     // In de Editor laten we de displays zoals ze zijn: daar kies je zelf Display 2-5 in de Game-weergave.
     static bool InBuild => !Application.isEditor;
@@ -123,16 +125,17 @@ public class WandIndeling : MonoBehaviour
         bestandGevonden = false;
         try
         {
-            if (!File.Exists(Pad)) { Debug.Log("[WandIndeling] Nog niet ingesteld (" + Pad + " bestaat niet). Druk F12 in de build."); return; }
-            var b = JsonUtility.FromJson<Bestand>(File.ReadAllText(Pad));
+            string pad = File.Exists(Pad) ? Pad : StandaardPad;
+            if (!File.Exists(pad)) { Debug.Log("[WandIndeling] Nog niet ingesteld (" + Pad + " bestaat niet). Druk F12 in de build."); return; }
+            var b = JsonUtility.FromJson<Bestand>(File.ReadAllText(pad));
             if (b == null || b.wandNaarDisplay == null || b.wandNaarDisplay.Length != AantalWanden)
             {
-                Debug.LogWarning("[WandIndeling] " + Pad + " is ongeldig; standaardindeling gebruikt.");
+                Debug.LogWarning("[WandIndeling] " + pad + " is ongeldig; standaardindeling gebruikt.");
                 return;
             }
             indeling = b.wandNaarDisplay;
             bestandGevonden = true;
-            Debug.Log("[WandIndeling] Geladen uit " + Pad + ": " + Beschrijf(indeling) + " (ingesteld " + b.ingesteldOp + ")");
+            Debug.Log("[WandIndeling] Geladen uit " + pad + ": " + Beschrijf(indeling) + " (ingesteld " + b.ingesteldOp + ")");
         }
         catch (Exception e)
         {

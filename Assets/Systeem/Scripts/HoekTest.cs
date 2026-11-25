@@ -1,15 +1,12 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
-/// Hulpmiddel bij het kalibreren (docent): druk op F9 en precies op elke hoek van de ruimte verschijnt een paal met blokjes en bollen,
-/// precies op de naad tussen twee wanden. Klopt de kalibratie, dan lijkt elk object één geheel, half op de ene en half op de
-/// andere wand. Nog een keer F9 = weg. Studenten hoeven hier niets mee te doen.
+/// Hulpmiddel bij het kalibreren (docent, F9, zie WandKalibratie): precies op elke hoek van de ruimte staat een paal met blokjes
+/// en bollen, op de naad tussen twee wanden. Klopt de kalibratie, dan lijkt elk object één geheel, half op de ene en half op de
+/// andere wand. Studenten hoeven hier niets mee te doen.
 /// </summary>
 public class HoekTest : MonoBehaviour
 {
-    const Key Toets = Key.F9;
-
     static readonly Color[] Kleuren =
     {
         new Color(0.9f, 0.25f, 0.2f),   // hoek wand 1-2
@@ -21,15 +18,7 @@ public class HoekTest : MonoBehaviour
     GameObject inhoud;
     Material basis;
 
-    void Update()
-    {
-        var tb = Keyboard.current;
-        if (tb == null || !tb[Toets].wasPressedThisFrame || WandIndeling.BezigMetInstellen) return;
-        if (inhoud != null) { Destroy(inhoud); inhoud = null; Debug.Log("[HoekTest] Uit"); return; }
-        Maak();
-    }
-
-    /// <summary>Hoektest aan of uit (ook vanuit de kalibratie met content, F10).</summary>
+    /// <summary>Hoektest aan of uit (vanuit de kalibratie, F9).</summary>
     public void Toon(bool aan)
     {
         if (aan && inhoud == null) Maak();
