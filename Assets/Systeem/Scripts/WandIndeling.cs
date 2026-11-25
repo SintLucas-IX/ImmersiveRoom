@@ -176,7 +176,8 @@ public class WandIndeling : MonoBehaviour
         foreach (var cam in FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
             // Camera's die naar een RenderTexture tekenen (bedienscherm, 3D-ogen) gaan niet naar een beamer
-            if (cam.targetTexture != null || wandVan.ContainsKey(cam)) continue;
+            // en de eigen camera's van WandIndeling/WandKalibratie (zwarte achtergrond per beamer) zijn geen wandcamera's
+            if (cam.targetTexture != null || wandVan.ContainsKey(cam) || IsEigen(cam.gameObject)) continue;
             if (cam.targetDisplay >= 1 && cam.targetDisplay <= AantalWanden) wandVan[cam] = cam.targetDisplay;
         }
         foreach (var canvas in FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None))

@@ -84,7 +84,7 @@ public class Anaglyph3D : MonoBehaviour
             p.rechts.enabled = aan;
             p.canvas.SetActive(aan);
             // De wandcamera hoeft de scene niet meer zelf te tekenen als 3D aan staat.
-            // In de build tekent de wandcamera naar een wandbeeld (WandKalibratie): dan tekent hij alleen nog de teksten en het 3D-beeld (laag UI).
+            // In de build tekent hij dan alleen nog de teksten en het 3D-beeld (laag UI), zie WandKalibratie.
             int alleenUI = 1 << LayerMask.NameToLayer("UI");
             p.wand.cullingMask = aan ? (p.wand.targetTexture != null ? alleenUI : 0) : p.oudeMask;
         }
@@ -107,14 +107,8 @@ public class Anaglyph3D : MonoBehaviour
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.targetDisplay = wand.targetDisplay;
         canvas.sortingOrder = -100;
-        if (wand.targetTexture != null)
-        {
-            // In de build tekent de wandcamera naar een wandbeeld (WandKalibratie): het 3D-beeld gaat daarin mee
-            canvas.renderMode = RenderMode.ScreenSpaceCamera;
-            canvas.worldCamera = wand;
-            canvas.planeDistance = wand.nearClipPlane + 0.06f;
-            p.canvas.layer = LayerMask.NameToLayer("UI");
-        }
+        // In de build tekent de wandcamera naar een wandbeeld (WandKalibratie): het 3D-beeld gaat daarin mee, achter de teksten
+        WandKalibratie.RegistreerCanvas(canvas, wand, 0.6f);
         var beeld = new GameObject("Beeld", typeof(RectTransform), typeof(RawImage));
         beeld.transform.SetParent(p.canvas.transform, false);
         beeld.layer = p.canvas.layer;

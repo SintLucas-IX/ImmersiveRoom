@@ -29,6 +29,13 @@ public class HoekTest : MonoBehaviour
         Maak();
     }
 
+    /// <summary>Hoektest aan of uit (ook vanuit de kalibratie met content, F10).</summary>
+    public void Toon(bool aan)
+    {
+        if (aan && inhoud == null) Maak();
+        if (!aan && inhoud != null) { Destroy(inhoud); inhoud = null; }
+    }
+
     void Maak()
     {
         // Midden = de plek van de wandcamera's; wand 1 kijkt "vooruit"
