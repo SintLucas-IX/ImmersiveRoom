@@ -83,8 +83,10 @@ public class Anaglyph3D : MonoBehaviour
             p.links.enabled = aan;
             p.rechts.enabled = aan;
             p.canvas.SetActive(aan);
-            // De wandcamera hoeft de scene niet meer zelf te tekenen als 3D aan staat
-            p.wand.cullingMask = aan ? 0 : p.oudeMask;
+            // De wandcamera hoeft de scene niet meer zelf te tekenen als 3D aan staat.
+            // In de build tekent de wandcamera naar een wandbeeld (WandKalibratie): dan tekent hij alleen nog de teksten en het 3D-beeld (laag UI).
+            int alleenUI = 1 << LayerMask.NameToLayer("UI");
+            p.wand.cullingMask = aan ? (p.wand.targetTexture != null ? alleenUI : 0) : p.oudeMask;
         }
         if (aan) Bijwerken();
     }
@@ -105,8 +107,17 @@ public class Anaglyph3D : MonoBehaviour
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.targetDisplay = wand.targetDisplay;
         canvas.sortingOrder = -100;
+        if (wand.targetTexture != null)
+        {
+            // In de build tekent de wandcamera naar een wandbeeld (WandKalibratie): het 3D-beeld gaat daarin mee
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = wand;
+            canvas.planeDistance = wand.nearClipPlane + 0.06f;
+            p.canvas.layer = LayerMask.NameToLayer("UI");
+        }
         var beeld = new GameObject("Beeld", typeof(RectTransform), typeof(RawImage));
         beeld.transform.SetParent(p.canvas.transform, false);
+        beeld.layer = p.canvas.layer;
         var rt = beeld.GetComponent<RectTransform>();
         rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
         p.materiaal = new Material(anaglyphMateriaal);
@@ -126,6 +137,7 @@ public class Anaglyph3D : MonoBehaviour
         oog.CopyFrom(wand);
         oog.targetTexture = doel;
         oog.targetDisplay = 0;
+        oog.depth = wand.depth - 1;   // eerst de ogen, dan de wand
         oog.enabled = false;
         return oog;
     }
@@ -136,7 +148,7 @@ public class Anaglyph3D : MonoBehaviour
         {
             p.links.transform.localPosition = new Vector3(-oogafstand / 2f, 0, 0);
             p.rechts.transform.localPosition = new Vector3(oogafstand / 2f, 0, 0);
-            float aspect = (float)Breedte / Hoogte;
+            float aspect = p.wand.aspect;   // de verhouding van de wand (zie WandKalibratie)
             p.links.projectionMatrix = OogProjectie(p.wand, aspect, oogafstand, focusAfstand, true);
             p.rechts.projectionMatrix = OogProjectie(p.wand, aspect, oogafstand, focusAfstand, false);
             p.materiaal.SetFloat("_Modus", (float)bril);
@@ -156,6 +168,8 @@ public class Anaglyph3D : MonoBehaviour
         float halfBreed = top * aspect;
         float schuif = (oogafstand / 2f) * near / Mathf.Max(0.01f, focusAfstand);
         float s = links ? schuif : -schuif;
-        return Matrix4x4.Frustum(-halfBreed + s, halfBreed + s, -top, top, near, far);
+        // Is het beeld van de wand omhoog geschoven (WandKalibratie)? Dan de ogen ook
+        float v = wand.projectionMatrix[1, 2] * top;
+        return Matrix4x4.Frustum(-halfBreed + s, halfBreed + s, -top + v, top + v, near, far);
     }
 }

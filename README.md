@@ -107,6 +107,22 @@ Windows nummert de beamers in een eigen volgorde. Druk in de build op **F12**: e
 `C:\Users\Public\ImmersiveRoom\wandindeling.json` en geldt voor elke build op die pc. Backspace = vorige stap, Esc = stoppen.
 Staat er linksonder op het bedienscherm een rode balk "Wandindeling niet ingesteld", dan is dit nog niet gedaan.
 
+**Docent: het beeld precies op de wand zetten (F11, alleen in de build)**
+Unity zet het beeld van elke beamer vervormd neer, zodat het precies op de wand valt (de beamers zelf blijven zoals ze zijn).
+Druk in de build op **F11**: één wand tegelijk krijgt een testbeeld, de andere zijn zwart.
+
+| Toets | Wat |
+|---|---|
+| 1-4 | hoek kiezen (1 linksboven, 2 rechtsboven, 3 rechtsonder, 4 linksonder) |
+| pijltjes | hoek verschuiven (Shift = 20 pixels, Ctrl = 1 pixel) |
+| + / - | verhouding, tot de rode cirkel op de muur echt rond is |
+| PageUp / PageDown | de inhoud van deze wand omhoog / omlaag |
+| R | hoeken van deze wand terug |
+| Tab / Shift+Tab | volgende / vorige wand |
+| Enter / Esc | opslaan / stoppen zonder opslaan |
+
+Bewaard in `C:\Users\Public\ImmersiveRoom\wandkalibratie.json`, voor elke build op die pc. Studenten hoeven hier niets mee te doen.
+
 ## Je eigen scene uit een ander project (bv. je kermis of je Hygge-beleving)
 
 1. In je **eigen project**: klik in het **Project**-venster met de rechtermuisknop op je map

@@ -82,6 +82,20 @@ public class WandIndeling : MonoBehaviour
         var go = new GameObject("WandIndeling (automatisch)");
         DontDestroyOnLoad(go);
         instantie = go.AddComponent<WandIndeling>();
+        go.AddComponent<WandKalibratie>();
+    }
+
+    /// <summary>Na elke geladen scene: welke camera's en canvassen bij welke wand (1-4) horen.</summary>
+    public static event Action<IReadOnlyDictionary<UnityEngine.Object, int>> SceneIngedeeld;
+
+    /// <summary>Na F12: de beamers zijn anders aan de wanden gekoppeld.</summary>
+    public static event Action IndelingGewijzigd;
+
+    /// <summary>Op welk Unity-display (index) wand 1-4 staat.</summary>
+    public static int DisplayVanWand(int wand)
+    {
+        if (instantie == null || wand < 1 || wand > AantalWanden) return wand;
+        return InBuild ? instantie.indeling[wand - 1] : wand;
     }
 
     void Awake()
@@ -170,6 +184,7 @@ public class WandIndeling : MonoBehaviour
             if (canvas.targetDisplay >= 1 && canvas.targetDisplay <= AantalWanden) wandVan[canvas] = canvas.targetDisplay;
         }
         PasToe();
+        SceneIngedeeld?.Invoke(wandVan);
     }
 
     void PasToe()
@@ -199,7 +214,7 @@ public class WandIndeling : MonoBehaviour
 
         if (!BezigMetInstellen)
         {
-            if (toetsenbord[InstelToets].wasPressedThisFrame) BeginInstellen();
+            if (toetsenbord[InstelToets].wasPressedThisFrame && !WandKalibratie.Bezig) BeginInstellen();
             return;
         }
 
@@ -248,6 +263,7 @@ public class WandIndeling : MonoBehaviour
         bool ok = Bewaar();
         bestandGevonden = ok || bestandGevonden;
         PasToe();
+        IndelingGewijzigd?.Invoke();
         StopInstellen(ok ? "Wandindeling bewaard en toegepast:\n" + Beschrijf(indeling) : "Toegepast, maar NIET bewaard (zie de Console).");
     }
 

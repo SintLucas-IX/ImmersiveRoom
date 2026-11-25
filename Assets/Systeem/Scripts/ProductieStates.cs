@@ -96,7 +96,7 @@ public class ProductieStates : MonoBehaviour
         if (toetsenbord == null) return;
 
         // Tijdens het instellen van de beamers (F12) zijn de toetsen voor de wandindeling, niet voor de productie
-        if (WandIndeling.BezigMetInstellen) { wachtendeToets = Key.None; nfcBuffer = ""; return; }
+        if (WandIndeling.BezigMetInstellen || WandKalibratie.Bezig) { wachtendeToets = Key.None; nfcBuffer = ""; return; }
 
         float nu = Time.unscaledTime;
         foreach (var knop in toetsenbord.allKeys)
@@ -138,7 +138,7 @@ public class ProductieStates : MonoBehaviour
 
     void BijTeken(char teken)
     {
-        if (char.IsControl(teken) || WandIndeling.BezigMetInstellen) return;
+        if (char.IsControl(teken) || WandIndeling.BezigMetInstellen || WandKalibratie.Bezig) return;
         // Meer dan een halve seconde stil? Dan begint er een nieuwe code.
         if (Time.unscaledTime - laatsteTekenTijd > 0.5f) nfcBuffer = "";
         laatsteTekenTijd = Time.unscaledTime;
